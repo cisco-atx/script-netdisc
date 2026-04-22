@@ -1,27 +1,23 @@
-"""
-Netdisc worker module
+"""Netdisc worker module.
 
 Runs network discovery across multiple devices, collects interface,
 L2/L3, routing, inventory, and configuration data, and generates
 an Excel report.
 
-This module is executed inside a Netaudit worker thread.
+Module path: workers.py
 """
 
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from socket import gethostbyname, getfqdn
+from socket import getfqdn, gethostbyname
 
-from netcore import GenericHandler, get_config_section, XLBW
+from netcore import GenericHandler, XLBW, get_config_section
 
-
-# =========================
-# Utility helpers
-# =========================
 
 def _normalize_iface(iface: str) -> str:
+    """Normalize interface name to short format."""
     labels = ['Te', 'Gi', 'Fa', 'Eth', 'Lo', 'Vl', 'Two', 'Twe']
     for label in labels:
         if re.match(f'^{label}', iface, re.IGNORECASE):
@@ -31,6 +27,7 @@ def _normalize_iface(iface: str) -> str:
 
 
 def _expand_iface(iface: str) -> str:
+    """Expand interface name to full format."""
     mapping = {
         'Te': 'TenGigabitEthernet',
         'Gi': 'GigabitEthernet',
@@ -39,7 +36,7 @@ def _expand_iface(iface: str) -> str:
         'Two': 'TwoGigabitEthernet',
         'Twe': 'TwentyFiveGigE',
         'Lo': 'Loopback',
-        'Vl': 'Vlan'
+        'Vl': 'Vlan',
     }
     for short, full in mapping.items():
         if re.match(f'^{short}', iface, re.IGNORECASE):
@@ -48,25 +45,15 @@ def _expand_iface(iface: str) -> str:
     return iface
 
 
-# =========================
-# Main entry
-# =========================
-
 def run_netdisc(devices, flags, connector, ctx):
-    """
-    Execute network discovery across multiple devices.
-    """
-
+    """Execute network discovery across multiple devices."""
     total_devices = len(devices)
-
     ctx.log(f"Starting Netdisc for {total_devices} devices")
 
-    data = {
-        "summary": {},
-        "links": {}
-    }
+    data = {"summary": {}, "links": {}}
 
     def worker(device):
+        """Process a single device."""
         ctx.log(f"[{device}] Connecting")
 
         proxy = None
@@ -89,19 +76,16 @@ def run_netdisc(devices, flags, connector, ctx):
             ctx.error(f"[{device}] Connection failed: {e}")
             return
 
-
-
-        # =========================
-        # Data collection
-        # =========================
-
         ctx.log(f"[{device}] Connected, collecting data")
 
-        iface_data = handler.sendCommand(
-            cmd="show interface",
-            autoParse=True,
-            key="interface"
-        )
+        try:
+            iface_data = handler.sendCommand(
+                cmd="show interface",
+                autoParse=True,
+                key="interface",
+            )
+        except Exception:
+            return
 
         iface_status = {}
         iface_desc = {}
@@ -109,86 +93,104 @@ def run_netdisc(devices, flags, connector, ctx):
             iface_status = handler.sendCommand(
                 cmd="show interface status",
                 autoParse=True,
-                key="interface"
+                key="interface",
             )
             iface_desc = handler.sendCommand(
                 cmd="show interface description",
                 autoParse=True,
-                key="interface"
+                key="interface",
             )
 
-        swport_data = handler.sendCommand(
-            cmd="show interface switchport",
-            autoParse=True,
-            key="interface"
-        ) if flags["switchport"] else {}
+        swport_data = (
+            handler.sendCommand(
+                cmd="show interface switchport",
+                autoParse=True,
+                key="interface",
+            )
+            if flags["switchport"]
+            else {}
+        )
 
-        vlan_data = handler.sendCommand(
-            cmd="show vlan",
-            autoParse=True,
-            key="vlan_id"
-        ) if flags["vlans"] else {}
+        vlan_data = (
+            handler.sendCommand(
+                cmd="show vlan",
+                autoParse=True,
+                key="vlan_id",
+            )
+            if flags["vlans"]
+            else {}
+        )
 
-        mac_data = handler.sendCommand(
-            cmd="show mac address",
-            autoParse=True,
-            key="mac_address"
-        ) if flags["mac"] else {}
+        mac_data = (
+            handler.sendCommand(
+                cmd="show mac address",
+                autoParse=True,
+                key="mac_address",
+            )
+            if flags["mac"]
+            else {}
+        )
 
-        arp_data = handler.sendCommand(
-            cmd="show ip arp",
-            autoParse=True,
-            key="mac_address"
-        ) if flags["arp"] else {}
+        arp_data = (
+            handler.sendCommand(
+                cmd="show ip arp",
+                autoParse=True,
+                key="mac_address",
+            )
+            if flags["arp"]
+            else {}
+        )
 
-        lldp_data = {}
-        cdp_data = {}
+        lldp_data, cdp_data = {}, {}
         if flags["cdp_lldp"]:
             lldp_data = handler.sendCommand(
                 cmd="show lldp neighbors",
                 autoParse=True,
-                key="local_interface"
+                key="local_interface",
             )
             cdp_data = handler.sendCommand(
                 cmd="show cdp neighbors",
                 autoParse=True,
-                key="local_interface"
+                key="local_interface",
             )
 
-        ip_iface_data = handler.sendCommand(
-            cmd="show ip interface",
-            autoParse=True,
-            key="interface"
-        ) if flags["ip_interface"] else {}
+        ip_iface_data = (
+            handler.sendCommand(
+                cmd="show ip interface",
+                autoParse=True,
+                key="interface",
+            )
+            if flags["ip_interface"]
+            else {}
+        )
 
-        bgp_data = {}
-        ospf_data = {}
+        bgp_data, ospf_data = {}, {}
         if flags["routing"]:
             bgp_data = handler.sendCommand(
                 cmd="show ip bgp neighbors",
                 autoParse=True,
-                key="neighbor"
+                key="neighbor",
             )
             ospf_data = handler.sendCommand(
                 cmd="show ip ospf interface brief",
                 autoParse=True,
-                key="interface"
+                key="interface",
             )
 
-        config = handler.sendCommand("show runn") if flags["config"] else ""
+        config = (
+            handler.sendCommand("show runn")
+            if flags["config"]
+            else ""
+        )
 
         version = {}
         mgmt_ip = ""
         if flags["inventory"]:
             version = handler.sendCommand(
                 cmd="show version",
-                autoParse=True
+                autoParse=True,
             )[0]
             mgmt_ip = gethostbyname(device)
-
-        # =========================
-        # Processing
-        # =========================
 
         ctx.log(f"[{device}] Processing data")
 
@@ -199,44 +201,55 @@ def run_netdisc(devices, flags, connector, ctx):
             links[iface_n] = {}
 
             if flags["interface"]:
-                links[iface_n].update({
-                    "Status": "",
-                    "Description": "",
-                    "Link": "",
-                    "Duplex": "",
-                    "Speed": "",
-                    "MediaType": ""
-                })
+                links[iface_n].update(
+                    {
+                        "Status": "",
+                        "Description": "",
+                        "Link": "",
+                        "Duplex": "",
+                        "Speed": "",
+                        "MediaType": "",
+                    }
+                )
+
                 for k, v in iface_status.items():
                     if iface_n == _normalize_iface(k):
-                        links[iface_n].update({
-                            "Status": v["status"],
-                            "Link": v["vlan_id"],
-                            "Duplex": v["duplex"],
-                            "Speed": v["speed"],
-                            "MediaType": v["type"],
-                        })
+                        links[iface_n].update(
+                            {
+                                "Status": v["status"],
+                                "Link": v["vlan_id"],
+                                "Duplex": v["duplex"],
+                                "Speed": v["speed"],
+                                "MediaType": v["type"],
+                            }
+                        )
+
                 for k, v in iface_desc.items():
                     if iface_n == _normalize_iface(k):
                         links[iface_n]["Description"] = v["description"]
 
             if flags["switchport"]:
-                links[iface_n].update({
-                    "Switchport": "",
-                    "Access": "",
-                    "Voice": "",
-                    "Trunk": "",
-                    "Native": ""
-                })
+                links[iface_n].update(
+                    {
+                        "Switchport": "",
+                        "Access": "",
+                        "Voice": "",
+                        "Trunk": "",
+                        "Native": "",
+                    }
+                )
+
                 for k, v in swport_data.items():
                     if iface_n == _normalize_iface(k):
-                        links[iface_n].update({
-                            "Switchport": v["mode"],
-                            "Access": v["access_vlan"],
-                            "Voice": v["voice_vlan"],
-                            "Trunk": v["trunking_vlans"],
-                            "Native": v["native_vlan"],
-                        })
+                        links[iface_n].update(
+                            {
+                                "Switchport": v["mode"],
+                                "Access": v["access_vlan"],
+                                "Voice": v["voice_vlan"],
+                                "Trunk": v["trunking_vlans"],
+                                "Native": v["native_vlan"],
+                            }
+                        )
 
             if flags["vlans"]:
                 links[iface_n]["VlanName"] = ""
@@ -245,63 +258,90 @@ def run_netdisc(devices, flags, connector, ctx):
                         links[iface_n]["VlanName"] = vlan["vlan_name"]
 
             if flags["cdp_lldp"]:
-                links[iface_n].update({
-                    "Neighbor": "",
-                    "Platform": "",
-                    "Capability": "",
-                    "RemoteIface": ""
-                })
+                links[iface_n].update(
+                    {
+                        "Neighbor": "",
+                        "Platform": "",
+                        "Capability": "",
+                        "RemoteIface": "",
+                    }
+                )
+
                 for k, v in lldp_data.items():
                     if iface_n == _normalize_iface(k):
-                        links[iface_n].update({
-                            "Neighbor": v["neighbor"],
-                            "Capability": v["capabilities"],
-                            "RemoteIface": _normalize_iface(v["remote_interface"]),
-                        })
+                        links[iface_n].update(
+                            {
+                                "Neighbor": v["neighbor"],
+                                "Capability": v["capabilities"],
+                                "RemoteIface": _normalize_iface(
+                                    v["remote_interface"]
+                                ),
+                            }
+                        )
+
                 for k, v in cdp_data.items():
                     if iface_n == _normalize_iface(k):
-                        links[iface_n].update({
-                            "Neighbor": v["neighbor"],
-                            "Platform": v["platform"],
-                            "Capability": v["capability"],
-                            "RemoteIface": _normalize_iface(v["remote_interface"]),
-                        })
+                        links[iface_n].update(
+                            {
+                                "Neighbor": v["neighbor"],
+                                "Platform": v["platform"],
+                                "Capability": v["capability"],
+                                "RemoteIface": _normalize_iface(
+                                    v["remote_interface"]
+                                ),
+                            }
+                        )
 
             if flags["mac"]:
                 links[iface_n]["MAC"] = []
                 links[iface_n]["VLAN"] = []
+
                 if flags["arp"]:
                     links[iface_n]["ARP"] = []
                     links[iface_n]["FQDN"] = []
+
                 for mac, mac_props in mac_data.items():
                     if iface_n == _normalize_iface(mac_props["ports"]):
                         links[iface_n]["MAC"].append(mac)
-                        links[iface_n]["VLAN"].append(mac_props["vlan_id"])
+                        links[iface_n]["VLAN"].append(
+                            mac_props["vlan_id"]
+                        )
+
                         if flags["arp"]:
-                            ip = arp_data.get(mac, {}).get("ip_address", "")
+                            ip = arp_data.get(mac, {}).get(
+                                "ip_address", ""
+                            )
                             links[iface_n]["ARP"].append(ip)
-                            links[iface_n]["FQDN"].append(getfqdn(ip) if ip else "")
+                            links[iface_n]["FQDN"].append(
+                                getfqdn(ip) if ip else ""
+                            )
 
             if flags["ip_interface"]:
-                links[iface_n].update({
-                    "IP Interface": "",
-                    "VRF": "",
-                })
+                links[iface_n].update(
+                    {"IP Interface": "", "VRF": ""}
+                )
+
                 for k, v in ip_iface_data.items():
                     if iface_n == _normalize_iface(k):
                         links[iface_n]["IP Interface"] = (
-                            f"{v['ip_address']}/{v['mask']}" if v["ip_address"] else ""
+                            f"{v['ip_address']}/{v['mask']}"
+                            if v["ip_address"]
+                            else ""
                         )
                         links[iface_n]["VRF"] = v["vrf"]
 
             if flags["routing"]:
                 links[iface_n]["Routing"] = {}
-                for n, v in bgp_data.items():
-                    if v["localhost_ip"] == iface_props.get("ip_address"):
+
+                for v in bgp_data.values():
+                    if v["localhost_ip"] == iface_props.get(
+                            "ip_address"
+                    ):
                         links[iface_n]["Routing"]["BGP"] = {
                             "remoteAsn": v["remote_asn"],
                             "state": v["bgp_state"],
                         }
+
                 for k, v in ospf_data.items():
                     if iface_n == _normalize_iface(k):
                         links[iface_n]["Routing"]["OSPF"] = {
@@ -311,31 +351,28 @@ def run_netdisc(devices, flags, connector, ctx):
 
             if flags["config"]:
                 links[iface_n]["Config"] = get_config_section(
-                    f"interface {_expand_iface(iface_n)}",
-                    config
+                    f"interface {_expand_iface(iface_n)}", config
                 )
 
         data["links"][device] = links
 
         summary = {}
         if flags["inventory"]:
-            summary.update({
-                "Hostname": version.get("hostname", ""),
-                "Version": version.get("version", ""),
-                "Model": version.get("hardware", ""),
-                "SerialNo": version.get("serial", ""),
-                "Uptime": version.get("uptime", ""),
-                "IP": mgmt_ip,
-            })
+            summary.update(
+                {
+                    "Hostname": version.get("hostname", ""),
+                    "Version": version.get("version", ""),
+                    "Model": version.get("hardware", ""),
+                    "SerialNo": version.get("serial", ""),
+                    "Uptime": version.get("uptime", ""),
+                    "IP": mgmt_ip,
+                }
+            )
 
         data["summary"][device] = summary
 
         handler.close()
         ctx.log(f"[{device}] Completed")
-
-    # =========================
-    # Parallel execution
-    # =========================
 
     with ThreadPoolExecutor(max_workers=8) as pool:
         pool.map(worker, devices)
@@ -343,14 +380,12 @@ def run_netdisc(devices, flags, connector, ctx):
     ctx.log("All devices processed, generating report")
 
     _generate_report(data, ctx)
+
     ctx.log("Netdisc execution finished")
 
 
-# =========================
-# Reporting
-# =========================
-
 def _generate_report(data, ctx):
+    """Generate Excel report from collected data."""
     timestamp = datetime.now().strftime("%Y-%m-%d_%H.%M")
     filename = f"Netdisc_{timestamp}.xlsx"
     path = os.path.join(ctx.output_dir, filename)
@@ -373,19 +408,19 @@ def _generate_report(data, ctx):
 
 
 def _reindex(data, key):
-    out = {}
-    for i, (k, v) in enumerate(data.items(), 1):
-        out[i] = {key: k}
-        out[i].update(v)
-    return out
+    """Reindex dictionary data with incremental integer keys."""
+    return {
+        i: {key: k, **v}
+        for i, (k, v) in enumerate(data.items(), 1)
+    }
 
 
 def _flatten_links(data):
+    """Flatten nested link data for report output."""
     out = {}
     idx = 0
     for device, links in data.items():
         for port, props in links.items():
             idx += 1
-            out[idx] = {"Hostname": device, "Port": port}
-            out[idx].update(props)
+            out[idx] = {"Hostname": device, "Port": port, **props}
     return out

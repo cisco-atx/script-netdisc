@@ -1,108 +1,148 @@
+<!-- =========================
+     Netdisc Styles
+     ========================= -->
 <style>
-  .snapshot-container {
-    display: flex;
-    gap: 20px;
-    width: 100%;
-    box-sizing: border-box;
-  }
+    /* Container holding both Devices and Diagnostics sections */
+    .netdisc-container {
+      display: flex;
+      gap: 20px;
+      width: 100%;
+      box-sizing: border-box;
+    }
 
-  .snapshot-column {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-width: 0;
-  }
+    /* Individual column for each section */
+    .netdisc-column {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-width: 0;
+    }
 
-  .snapshot-column h4 {
-    margin: 6px;
-  }
+    /* Section headings */
+    .netdisc-column h4 {
+      margin: 6px;
+    }
 
-  .devices-textarea {
-    height: 500px;
-    resize: none;
-    line-height: 2;
-  }
+    /* Textarea for device input */
+    .devices-textarea {
+      height: 500px;
+      resize: none;
+      line-height: 2;
+    }
 
-  .diagnostics-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
-    width: 100%;
-    margin-top: 6px;
-    box-sizing: border-box;
-    justify-items: start;
-    align-items: start;
-  }
+    /* Grid layout for diagnostics checkboxes */
+    .diagnostics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      width: 100%;
+      margin-top: 6px;
+      box-sizing: border-box;
+      justify-items: start;
+      align-items: start;
+    }
 
-  .diag-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    white-space: nowrap;
-  }
+    /* Individual checkbox item */
+    .diag-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
 </style>
 
-<div class="snapshot-container">
+<!-- =========================
+     Netdisc Container
+     ========================= -->
+<div class="netdisc-container">
 
-  <!-- Devices -->
-  <div class="snapshot-column">
-    <h4>Devices</h4>
-    <textarea
-      class="devices-textarea"
-      id="devices"
-      name="devices"
-      rows="8"
-      placeholder="router1.example.com&#10;router2.example.com"
-      required
-    ></textarea>
-  </div>
+    <!-- =========================
+         Devices Section
+         ========================= -->
+    <section class="netdisc-column">
+        <h4>Devices</h4>
 
-  <!-- Diagnostics -->
-  <div class="snapshot-column">
-    <h4>Diagnostics</h4>
+        <!-- Textarea for entering device hostnames -->
+        <textarea
+                class="devices-textarea"
+                id="devices"
+                name="devices"
+                rows="8"
+                placeholder="router1.example.com&#10;router2.example.com"
+                required
+        ></textarea>
+    </section>
 
-    <div class="diagnostics-grid">
-      <label class="diag-item">
-        <input type="checkbox" name="interface" checked> Interface
-      </label>
+    <!-- =========================
+         Diagnostics Section
+         ========================= -->
+    <section class="netdisc-column">
+        <h4>Diagnostics</h4>
 
-      <label class="diag-item">
-        <input type="checkbox" name="mac" checked> MAC
-      </label>
+        <!-- Grid of diagnostic options -->
+        <div class="diagnostics-grid">
 
-      <label class="diag-item">
-        <input type="checkbox" name="arp" checked> ARP
-      </label>
+            <!-- Interface -->
+            <label class="diag-item">
+                <input type="checkbox" name="interface" checked>
+                Interface
+            </label>
 
-      <label class="diag-item">
-        <input type="checkbox" name="cdp_lldp" checked> CDP / LLDP
-      </label>
+            <!-- MAC -->
+            <label class="diag-item">
+                <input type="checkbox" name="mac" checked>
+                MAC
+            </label>
 
-      <label class="diag-item">
-        <input type="checkbox" name="vlans" checked> VLANs
-      </label>
+            <!-- ARP -->
+            <label class="diag-item">
+                <input type="checkbox" name="arp" checked>
+                ARP
+            </label>
 
-      <label class="diag-item">
-        <input type="checkbox" name="switchport" checked> Switchport
-      </label>
+            <!-- CDP / LLDP -->
+            <label class="diag-item">
+                <input type="checkbox" name="cdp_lldp" checked>
+                CDP / LLDP
+            </label>
 
-      <label class="diag-item">
-        <input type="checkbox" name="ip_interface" checked> IP Interface
-      </label>
+            <!-- VLANs -->
+            <label class="diag-item">
+                <input type="checkbox" name="vlans" checked>
+                VLANs
+            </label>
 
-      <label class="diag-item">
-        <input type="checkbox" name="routing" checked> Routing
-      </label>
+            <!-- Switchport -->
+            <label class="diag-item">
+                <input type="checkbox" name="switchport" checked>
+                Switchport
+            </label>
 
-      <label class="diag-item">
-        <input type="checkbox" name="inventory" checked> Inventory
-      </label>
+            <!-- IP Interface -->
+            <label class="diag-item">
+                <input type="checkbox" name="ip_interface" checked>
+                IP Interface
+            </label>
 
-      <label class="diag-item">
-        <input type="checkbox" name="config" checked> Config
-      </label>
-    </div>
+            <!-- Routing -->
+            <label class="diag-item">
+                <input type="checkbox" name="routing" checked>
+                Routing
+            </label>
 
-  </div>
+            <!-- Inventory -->
+            <label class="diag-item">
+                <input type="checkbox" name="inventory" checked>
+                Inventory
+            </label>
+
+            <!-- Config -->
+            <label class="diag-item">
+                <input type="checkbox" name="config" checked>
+                Config
+            </label>
+
+        </div>
+    </section>
 
 </div>
