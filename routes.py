@@ -34,6 +34,10 @@ class NetdiscScript:
         self.ctx = ctx
 
     @classmethod
+    def required(self):
+        return ["connector"]
+
+    @classmethod
     def input(self):
         """Render the input HTML template."""
         input_template = os.path.join(
